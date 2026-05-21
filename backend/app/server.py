@@ -124,6 +124,10 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 # ==========================================
 # API & WEBSOCKET ENDPOINTS
 # ==========================================
+@app.get("/")
+def read_root():
+    return {"status": "online", "system": "PulseGrid AI API Engine Active"}
+    
 @app.websocket("/ws/dashboard")
 async def websocket_endpoint(websocket: WebSocket):
     """The live portal for the React frontend."""
