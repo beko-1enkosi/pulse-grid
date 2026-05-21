@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -19,8 +19,7 @@ class Patient(PatientBase):
     status: str = "WAITING" # WAITING, EN_ROUTE, TREATED
     assigned_hospital_id: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- HOSPITAL SCHEMAS ---
 class Hospital(BaseModel):
@@ -32,8 +31,7 @@ class Hospital(BaseModel):
     available_beds: int
     current_wait_time_mins: float = 0.0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- AMBULANCE SCHEMAS ---
 class Ambulance(BaseModel):
@@ -43,5 +41,4 @@ class Ambulance(BaseModel):
     status: str = "IDLE" # IDLE, EN_ROUTE_PATIENT, EN_ROUTE_HOSPITAL
     assigned_patient_id: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -1,10 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from typing import List, Dict
 from datetime import datetime, timezone
 import uuid
-import asyncio  
-import random   
+import asyncio
+import random
 
 # Import our Pydantic blueprints
 from app.models.schemas import PatientCreate, Patient, Hospital
@@ -14,7 +15,39 @@ from app.core.triage_logic import evaluate_initial_triage
 from app.core.routing import find_best_hospital
 from app.core.queue_manager import sort_patient_queue
 
-app = FastAPI(title="PulseGrid AI", version="1.0.0")
+
+# ==========================================
+# BACKGROUND WORKERS (The Auto-Discharge Engine)
+# ==========================================
+async def discharge_loop():
+    """
+    Runs continuously in the background. 
+    Simulates patients recovering and being discharged, freeing up hospital beds.
+    """
+    while True:
+        await asyncio.sleep(4)  # Wait 4 seconds between network checks
+        
+        for hospital in db_hospitals.values():
+            # If the hospital is not completely empty...
+            if hospital.available_beds < hospital.total_beds:
+                # 30% chance someone gets discharged every tick
+                if random.random() < 0.3:
+                    hospital.available_beds += 1
+                    print(f"[*] DISCHARGE: 1 bed freed at {hospital.name} (Total Available: {hospital.available_beds})")
+
+
+# ==========================================
+# APP INITIALIZATION & LIFESPAN
+# ==========================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic: Fire up the auto-discharge loop
+    task = asyncio.create_task(discharge_loop())
+    yield
+    # Shutdown logic: Cancel the loop when the server stops
+    task.cancel()
+
+app = FastAPI(title="PulseGrid AI", version="1.0.0", lifespan=lifespan)
 
 # Allow the React frontend to communicate with this backend securely
 app.add_middleware(
@@ -24,6 +57,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ==========================================
 # IN-MEMORY DATABASE (For High-Speed Simulation)
@@ -36,6 +70,7 @@ db_hospitals: Dict[str, Hospital] = {
 
 db_patients: Dict[str, Patient] = {}
 hospital_queues: Dict[str, List[Patient]] = {"H-1": [], "H-2": [], "H-3": []}
+
 
 # ==========================================
 # API ENDPOINTS
@@ -100,28 +135,3 @@ def get_hospital_queue(hospital_id: str):
     optimized_queue = sort_patient_queue(raw_queue)
     
     return optimized_queue
-
-# ==========================================
-# BACKGROUND WORKERS (The Auto-Discharge Engine)
-# ==========================================
-
-async def discharge_loop():
-    """
-    Runs continuously in the background. 
-    Simulates patients recovering and being discharged, freeing up hospital beds.
-    """
-    while True:
-        await asyncio.sleep(4)  # Wait 4 seconds between network checks
-        
-        for hospital in db_hospitals.values():
-            # If the hospital is not completely empty...
-            if hospital.available_beds < hospital.total_beds:
-                # 30% chance someone gets discharged every tick
-                if random.random() < 0.3:
-                    hospital.available_beds += 1
-                    print(f"[*] DISCHARGE: 1 bed freed at {hospital.name} (Total Available: {hospital.available_beds})")
-
-@app.on_event("startup")
-async def startup_event():
-    """Fires up the background workers the moment the FastAPI server starts."""
-    asyncio.create_task(discharge_loop())
