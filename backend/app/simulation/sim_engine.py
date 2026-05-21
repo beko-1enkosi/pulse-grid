@@ -50,7 +50,7 @@ def send_patient_to_api(patient_data, x_coord, y_coord):
 
 def run_standard_simulation(interval_seconds=4):
     """Simulates standard city traffic, spawning one patient every few seconds."""
-    print(f"\n--- Starting Aegis Health City Simulation (1 event / {interval_seconds}s) ---")
+    print(f"\n--- Starting Pulse-Grid City Simulation (1 event / {interval_seconds}s) ---")
     print("Press Ctrl+C to stop the simulation.\n")
     try:
         while True:
