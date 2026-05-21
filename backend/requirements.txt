@@ -1,0 +1,12 @@
+# Web Framework & Data Validation
+fastapi[standard]
+pydantic
+
+# Database & Environment Configuration
+supabase
+python-dotenv
+
+# AI, Math, and Simulation Algorithms
+scipy
+numpy
+scikit-learn
