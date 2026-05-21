@@ -84,7 +84,7 @@ def trigger_mass_casualty_event(num_patients=50):
 
 if __name__ == "__main__":
     print("==========================================")
-    print("  AEGIS HEALTH: DISCRETE-EVENT SIMULATOR  ")
+    print("  PULSEGRID: DISCRETE-EVENT SIMULATOR  ")
     print("==========================================")
     print("1. Standard Traffic Simulation (Continuous)")
     print("2. Mass Casualty Stress Test (Burst)")
