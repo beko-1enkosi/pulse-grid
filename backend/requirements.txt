@@ -10,3 +10,7 @@ python-dotenv
 scipy
 numpy
 scikit-learn
+
+# For Testing
+pytest
+httpx
