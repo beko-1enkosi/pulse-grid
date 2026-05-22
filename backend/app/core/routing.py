@@ -1,30 +1,32 @@
 from typing import List, Optional
 from app.models.schemas import Hospital
 
-# Simulated average ambulance speed in grid units per minute.
-# In a real system, this would be updated live via traffic APIs.
 AMBULANCE_SPEED_UNITS_PER_MIN = 1.5
 
 def calculate_grid_travel_time(x1: float, y1: float, x2: float, y2: float) -> float:
-    """
-    Calculates the travel time between two grid coordinates.
-    Uses Manhattan Distance to simulate navigating city blocks 
-    (the standard A* heuristic for urban map routing).
-    """
     distance = abs(x2 - x1) + abs(y2 - y1)
-    travel_time_mins = distance / AMBULANCE_SPEED_UNITS_PER_MIN
-    return travel_time_mins
+    return distance / AMBULANCE_SPEED_UNITS_PER_MIN
 
-def find_best_hospital(patient_x: float, patient_y: float, hospitals: List[Hospital]) -> Optional[Hospital]:
+def calculate_predictive_congestion(hospital: Hospital) -> float:
     """
-    Core Routing Engine for the Healthcare Network.
+    Calculates C_h = (Q_h + I_h) / B_h
+    (Current Queue + Incoming) / Total Beds
+    """
+    incoming_en_route = hospital.total_beds - hospital.available_beds - hospital.active_queue_length
+    # Prevent division by zero and negative incoming values
+    incoming_en_route = max(0, incoming_en_route) 
     
-    Instead of finding the closest geographic hospital, it calculates 
-    the Predicted Time-to-Treatment (PTT) for every facility.
-    
-    PTT = Travel Time + Current APQ-h Queue Delay at the hospital.
-    
-    Returns the hospital that minimizes the PTT, actively balancing the network load.
+    if hospital.total_beds <= 0:
+        return float('inf')
+        
+    congestion_score = (hospital.active_queue_length + incoming_en_route) / hospital.total_beds
+    return congestion_score
+
+def find_best_hospital(patient_x: float, patient_y: float, patient_triage: int, hospitals: List[Hospital]) -> Optional[Hospital]:
+    """
+    Advanced Routing Engine.
+    Minimizes PTT = T_travel + T_queue + R_deterioration
+    Factors in C_h (Predictive Congestion) to balance the network.
     """
     if not hospitals:
         return None
@@ -33,17 +35,25 @@ def find_best_hospital(patient_x: float, patient_y: float, hospitals: List[Hospi
     lowest_ptt = float('inf')
     
     for hospital in hospitals:
-        # Ignore hospitals with no available capacity to prevent catastrophic overload
         if hospital.available_beds <= 0:
             continue
             
-        # 1. Calculate the dynamic travel time
+        # 1. T_travel
         travel_time = calculate_grid_travel_time(patient_x, patient_y, hospital.location_x, hospital.location_y)
         
-        # 2. Calculate the total Predicted Time-to-Treatment (PTT)
-        ptt = travel_time + hospital.current_wait_time_mins
+        # 2. R_deterioration (Clinical Risk)
+        # Higher triage levels get exponentially penalized for longer travel times
+        deterioration_risk = 0.0
+        if patient_triage >= 4:
+            deterioration_risk = travel_time * (patient_triage * 0.5)
+            
+        # 3. T_queue (adjusted by predictive congestion)
+        congestion_multiplier = 1.0 + calculate_predictive_congestion(hospital)
+        dynamic_queue_delay = hospital.current_wait_time_mins * congestion_multiplier
         
-        # 3. Optimize and select the lowest PTT
+        # 4. Total PTT calculation
+        ptt = travel_time + dynamic_queue_delay + deterioration_risk
+        
         if ptt < lowest_ptt:
             lowest_ptt = ptt
             best_hospital = hospital
