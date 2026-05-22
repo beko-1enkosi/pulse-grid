@@ -7,15 +7,19 @@ import uuid
 import asyncio
 import random
 import json
+import os
+import httpx
 
 # Import our Pydantic blueprints
 from app.models.schemas import PatientCreate, Patient, Hospital
+from app.models.schemas import ChatRequest
 
 # Import our core algorithmic engines
 from app.core.triage_logic import rule_based_explainable_inference
 from app.core.routing import find_best_hospital
 from app.core.queue_manager import sort_patient_queue
 
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # ==========================================
 # WEBSOCKET MANAGER (Real-Time Comm Link)
@@ -182,3 +186,49 @@ def get_hospital_queue(hospital_id: str):
     if hospital_id not in hospital_queues:
         raise HTTPException(status_code=404, detail="Hospital ID not recognized.")
     return sort_patient_queue(hospital_queues[hospital_id])
+
+# ==========================================
+# AI CHATBOT ENDPOINT (Powered by Claude)
+# ==========================================
+@app.post("/chat")
+async def chat_with_pulsegrid_ai(request: ChatRequest):
+    """
+    Acts as a secure proxy between the React frontend and OpenRouter (Claude).
+    """
+    if not OPENROUTER_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenRouter API key is missing from the server environment.")
+
+    # We inject a hidden system prompt so Claude knows its exact role
+    system_prompt = {
+        "role": "system",
+        "content": "You are the PulseGrid AI Command Assistant. You help emergency dispatchers monitor hospital congestion, explain triage logic, and verify ambulance routing. Be concise, professional, and highly technical."
+    }
+    
+    # Combine the system prompt with the user's chat history
+    messages = [system_prompt] + [msg.model_dump() for msg in request.messages]
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": "http://localhost:8000", 
+        "X-Title": "PulseGrid AI",
+        "Content-Type": "application/json"
+    }
+
+    # Asynchronously call OpenRouter
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json={
+                    # Updated to use Claude 3.5 Sonnet
+                    "model": "anthropic/claude-3.5-sonnet", 
+                    "messages": messages,
+                },
+                timeout=20.0  # Slightly increased timeout for heavier Claude models
+            )
+            response.raise_for_status()
+            data = response.json()
+            return {"reply": data["choices"][0]["message"]["content"]}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"OpenRouter connection failed: {str(e)}")

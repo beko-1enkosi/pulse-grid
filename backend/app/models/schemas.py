@@ -44,3 +44,11 @@ class Ambulance(BaseModel):
     assigned_patient_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+# --- CHATBOT SCHEMAS ---
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage]
